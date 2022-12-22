@@ -28,6 +28,15 @@ CHANNEL_MAP = {
     'dp_df': lambda x: x + 3,
 }
 
+def max_reduction(x):
+    return torch.max(
+                x, dim=-1, keepdim=False)[0]
+def mean_reduction(x):
+    return torch.mean(
+                x, dim=-1, keepdim=False)
+def sum_reduction(x):
+    return torch.sum(
+                x, dim=-1, keepdim=False)
 
 class ASSA(nn.Module):
     def __init__(self,
@@ -189,15 +198,24 @@ class ConvPool(nn.Module):
         self.convs = nn.Sequential(*convs)
 
         self.grouper = create_grouper(group_args)
+        # if reduction == 'max':
+        #     self.reduction_layer = lambda x: torch.max(
+        #         x, dim=-1, keepdim=False)[0]
+        # elif reduction == 'avg' or reduction == 'mean':
+        #     self.reduction_layer = lambda x: torch.mean(
+        #         x, dim=-1, keepdim=False)
+        # elif reduction == 'sum':
+        #     self.reduction_layer = lambda x: torch.sum(
+        #         x, dim=-1, keepdim=False)
+        # else:
+        #     raise NotImplementedError(
+        #         f'reduction {self.reduction} not implemented')
         if reduction == 'max':
-            self.reduction_layer = lambda x: torch.max(
-                x, dim=-1, keepdim=False)[0]
+            self.reduction_layer = max_reduction
         elif reduction == 'avg' or reduction == 'mean':
-            self.reduction_layer = lambda x: torch.mean(
-                x, dim=-1, keepdim=False)
+            self.reduction_layer = mean_reduction
         elif reduction == 'sum':
-            self.reduction_layer = lambda x: torch.sum(
-                x, dim=-1, keepdim=False)
+            self.reduction_layer = sum_reduction
         else:
             raise NotImplementedError(
                 f'reduction {self.reduction} not implemented')

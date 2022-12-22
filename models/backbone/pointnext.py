@@ -12,17 +12,35 @@ from ..layers import create_convblock1d, create_convblock2d, create_act, CHANNEL
     create_grouper, furthest_point_sample, random_sample, three_interpolation, get_aggregation_feautres
 
 
+# def get_reduction_fn(reduction):
+#     reduction = 'mean' if reduction.lower() == 'avg' else reduction
+#     assert reduction in ['sum', 'max', 'mean']
+#     if reduction == 'max':
+#         pool = lambda x: torch.max(x, dim=-1, keepdim=False)[0]
+#     elif reduction == 'mean':
+#         pool = lambda x: torch.mean(x, dim=-1, keepdim=False)
+#     elif reduction == 'sum':
+#         pool = lambda x: torch.sum(x, dim=-1, keepdim=False)
+#     return pool
+
 def get_reduction_fn(reduction):
     reduction = 'mean' if reduction.lower() == 'avg' else reduction
     assert reduction in ['sum', 'max', 'mean']
     if reduction == 'max':
-        pool = lambda x: torch.max(x, dim=-1, keepdim=False)[0]
+        pool = max_reduction
     elif reduction == 'mean':
-        pool = lambda x: torch.mean(x, dim=-1, keepdim=False)
+        pool = mean_reduction
     elif reduction == 'sum':
-        pool = lambda x: torch.sum(x, dim=-1, keepdim=False)
+        pool = sum_reduction
     return pool
 
+
+def max_reduction(x):
+    return torch.max(x, dim=-1, keepdim=False)[0]
+def mean_reduction(x):
+    return torch.mean(x, dim=-1, keepdim=False)
+def sum_reduction(x):
+    return torch.sum(x, dim=-1, keepdim=False)
 
 class LocalAggregation(nn.Module):
     """Local aggregation layer for a set 
@@ -131,7 +149,8 @@ class SetAbstraction(nn.Module):
                 group_args.nsample = None
                 group_args.radius = None
             self.grouper = create_grouper(group_args)
-            self.pool = lambda x: torch.max(x, dim=-1, keepdim=False)[0]
+            #self.pool = lambda x: torch.max(x, dim=-1, keepdim=False)[0]
+            self.pool = get_reduction_fn('max')
             if sampler.lower() == 'fps':
                 self.sample_fn = furthest_point_sample
             elif sampler.lower() == 'random':
