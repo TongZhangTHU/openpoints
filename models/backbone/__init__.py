@@ -1,6 +1,7 @@
 from .pointnet import PointNetEncoder
 from .pointnetv2 import PointNet2Encoder, PointNet2Decoder, PointNetFPModule
 from .pointnext import PointNextEncoder, PointNextDecoder
+from .pointnext_lang import PointNextLangEncoder
 from .dgcnn import DGCNN
 from .deepgcn import DeepGCN
 from .pointmlp import PointMLPEncoder, PointMLP
