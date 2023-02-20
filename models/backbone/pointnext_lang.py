@@ -75,6 +75,7 @@ class SetAbstraction(nn.Module):
         if self.is_head:
             f = self.convs(f)  # (n, c)
         else:
+            # (1) subsample
             if not self.all_aggr:
                 idx = self.sample_fn(p, p.shape[1] // self.stride).long()
                 new_p = torch.gather(p, 1, idx.unsqueeze(-1).expand(-1, -1, 3))
@@ -94,8 +95,10 @@ class SetAbstraction(nn.Module):
                     identity = self.skipconv(fi)
             else:
                 fi = None
+            # (2) grouping
             dp, fj = self.grouper(new_p, p, f)
             fj = get_aggregation_feautres(new_p, dp, fi, fj, feature_type=self.feature_type)
+            # (3) mlps (4) Reduction (max-pooling)
             f = self.pool(self.convs(fj))
             if self.use_res:
                 f = self.act(f + identity)
