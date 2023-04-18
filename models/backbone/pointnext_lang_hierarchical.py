@@ -342,6 +342,8 @@ class PointNextLangHierachicalEncoder(nn.Module):
                     f0 = f0 + resnet_layer_dict[i + self.resnet_pos]
                 elif self.resnet_fusion_type == 'concat':
                     f0 =  torch.cat([f0, resnet_layer_dict[i + self.resnet_pos]], dim=1)
+                elif self.resnet_fusion_type == 'mult':
+                    f0 = f0 * resnet_layer_dict[i + self.resnet_pos]
                 else:
                     raise NotImplementedError
                 f0 = self.feature_dropout_dict[str(i + self.resnet_pos)](f0)
