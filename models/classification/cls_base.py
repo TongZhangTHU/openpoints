@@ -23,14 +23,21 @@ class BaseCls(nn.Module):
             in_channels = self.encoder.out_channels if hasattr(self.encoder, 'out_channels') else cls_args.get('in_channels', None)
             if 'prediction_concat_dim' in cls_args:
                 in_channels = in_channels + cls_args.prediction_concat_dim
+                print('prediction_concat_dim is used to added to in_channels')
             cls_args.in_channels = in_channels
             self.prediction = build_model_from_cfg(cls_args)
         else:
             self.prediction = nn.Identity()
         self.criterion = build_criterion_from_cfg(criterion_args) if criterion_args is not None else None
 
-    def forward(self, data, prediction_concat_content=None):
-        global_feat = self.encoder.forward_cls_feat(data)
+    def forward(self, data, prediction_concat_content=None, frozen_encoder=False):
+        if frozen_encoder:
+            with torch.no_grad():
+                self.encoder.eval()
+                # self.encoder.forward_cls_feat.eval()
+                global_feat = self.encoder.forward_cls_feat(data)
+        else:
+            global_feat = self.encoder.forward_cls_feat(data)
         if prediction_concat_content is not None: 
             global_feat = torch.cat([global_feat, prediction_concat_content], dim=1)
         return self.prediction(global_feat)
