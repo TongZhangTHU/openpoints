@@ -48,14 +48,14 @@ class InvResMLP(nn.Module):
         self.act = create_act(act_args)
 
     def forward(self, pf):
-        p, f, idx = pf
+        p, f, idx = pf # difference(0) from pointnext.py, reserve idx for semantic branch concatenation
         identity = f
         f = self.convs([p, f])
         f = self.pwconv(f)
         if f.shape[-1] == identity.shape[-1] and self.use_res:
             f += identity
         f = self.act(f)
-        return [p, f, idx]
+        return [p, f, idx] # difference(1) from pointnext.py
 
 
 # This SetAbstraction class is slightly different from pointnext version
@@ -76,7 +76,7 @@ class SetAbstraction(nn.Module):
                  feature_type='dp_fj',
                  use_res=False,
                  is_head=False,
-                 use_skip=False,
+                 use_skip=False, # difference(0) from pointnext.py
                  **kwargs, 
                  ):
         super().__init__()
@@ -94,7 +94,7 @@ class SetAbstraction(nn.Module):
         if self.use_res:
             self.skipconv = create_convblock1d(
                 in_channels, channels[-1], norm_args=None, act_args=None) if in_channels != channels[
-                -1] or use_skip else nn.Identity()
+                -1] or use_skip else nn.Identity() # difference(1) from pointnext.py
             self.act = create_act(act_args)
 
         # actually, one can use local aggregation layer to replace the following
@@ -124,7 +124,7 @@ class SetAbstraction(nn.Module):
         p, f = pf
         if self.is_head:
             f = self.convs(f)  # (n, c)
-            idx = None
+            idx = None # difference(2) from pointnext.py
         else:
             # (1) subsample
             if not self.all_aggr:
@@ -132,7 +132,7 @@ class SetAbstraction(nn.Module):
                 new_p = torch.gather(p, 1, idx.unsqueeze(-1).expand(-1, -1, 3))
             else:
                 new_p = p
-                idx = None
+                idx = None # difference(3) from pointnext.py
             """ DEBUG neighbor numbers. 
             query_xyz, support_xyz = new_p, p
             radius = self.grouper.radius
@@ -155,7 +155,7 @@ class SetAbstraction(nn.Module):
             if self.use_res:
                 f = self.act(f + identity)
             p = new_p
-        return p, f, idx
+        return p, f, idx  # difference(4) from pointnext.py
 
 
 
@@ -361,4 +361,46 @@ class PointNextLangHierachicalEncoder(nn.Module):
                 else:
                     raise NotImplementedError
         return f0.squeeze(-1)
+    
+    def forward_seg_feat(self, p0, f0=None):
+        if hasattr(p0, 'keys'):
+            p0, f0, lang_goal_emb, resnet_layer_dict = p0['pos'], p0.get('x', None), p0.get('lang_goal_emb', None), p0.get('resnet_layer_dict', {})
+        if f0 is None:
+            f0 = p0.clone().transpose(1, 2).contiguous()
+        p, f = [p0], [f0]
+        for i in range(0, len(self.encoder)):
+            p0, f0, idx = self.encoder[i]([p0, f0])
+            p.append(p0)
+            f.append(f0)
+            
+            if idx is not None:
+                for layer, feature in resnet_layer_dict.items():
+                    #if layer >= (i + self.resnet_pos):
+                    resnet_layer_dict[layer] = torch.gather(
+                                            feature, -1, idx.unsqueeze(1).expand(-1, feature.shape[1], -1))
+
+            if (i + self.resnet_pos) in self.resnet_layer_index:
+                if self.resnet_fusion_type == 'add':
+                    f0 = f0 + resnet_layer_dict[i + self.resnet_pos]
+                elif self.resnet_fusion_type == 'concat':
+                    f0 =  torch.cat([f0, resnet_layer_dict[i + self.resnet_pos]], dim=1)
+                elif self.resnet_fusion_type == 'mult':
+                    f0 = f0 * resnet_layer_dict[i + self.resnet_pos]
+                else:
+                    raise NotImplementedError
+                f0 = self.feature_dropout_dict[str(i + self.resnet_pos)](f0)
+
+            if i in self.lang_index : 
+                l = self._proj_feature(lang_goal_emb, f0.shape[-1], self._lang_proj[str(i)])
+                if self.lang_fusion_type == 'mult':
+                    f0 = f0 * l
+                elif self.lang_fusion_type == 'add':
+                    f0 = f0 + l
+                elif self.lang_fusion_type == 'max':
+                    f0 = torch.max(f0, l)
+                elif self.lang_fusion_type == 'concat':
+                    f0 = torch.cat([f0, l], dim=1)
+                else:
+                    raise NotImplementedError
+        return p, f
 

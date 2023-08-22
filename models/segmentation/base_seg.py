@@ -36,12 +36,21 @@ class BaseSeg(nn.Module):
                 in_channels = self.encoder.out_channels
             else:
                 in_channels = cls_args.get('in_channels', None)
+            # if 'prediction_concat_dim' in cls_args:
+            #     in_channels = in_channels + cls_args.prediction_concat_dim
+            #     print('prediction_concat_dim is used to added to in_channels')
             cls_args.in_channels = in_channels
+            print('cls_args.in_channels:', in_channels)
             self.head = build_model_from_cfg(cls_args)
         else:
             self.head = None
 
-    def forward(self, data):
+    def forward(self, data, prediction_concat_content=None, frozen_encoder=False):
+        if prediction_concat_content is not None:
+            raise NotImplementedError('prediction_concat_content is not implemented for segmentation')
+        if frozen_encoder:
+            raise NotImplementedError('frozen_encoder is not implemented for segmentation')
+
         p, f = self.encoder.forward_seg_feat(data)
         if self.decoder is not None:
             f = self.decoder(p, f).squeeze(-1)
@@ -148,6 +157,66 @@ class SegHead(nn.Module):
         logits = self.head(end_points)
         return logits
 
+@MODELS.register_module()
+class SegHeadWithNormAct(nn.Module):
+    def __init__(self,
+                 num_classes, in_channels,
+                 mlps=None,
+                 norm_args={'norm': 'bn1d'},
+                 act_args={'act': 'relu'},
+                 dropout=0.5,
+                 global_feat=None, 
+                 **kwargs
+                 ):
+        """A scene segmentation head for ResNet backbone.
+        Args:
+            num_classes: class num.
+            in_channles: the base channel num.
+            global_feat: global features to concat. [max,avg]. Set to None if do not concat any.
+        Returns:
+            logits: (B, num_classes, N)
+        """
+        super().__init__()
+        if kwargs:
+            logging.warning(f"kwargs: {kwargs} are not used in {__class__.__name__}")
+        if global_feat is not None:
+            self.global_feat = global_feat.split(',')
+            multiplier = len(self.global_feat) + 1
+        else:
+            self.global_feat = None
+            multiplier = 1
+        in_channels *= multiplier
+        
+        if mlps is None:
+            mlps = [in_channels, in_channels] + [num_classes]
+        else:
+            if not isinstance(mlps, List):
+                mlps = [mlps]
+            mlps = [in_channels] + mlps + [num_classes]
+        heads = []
+        for i in range(len(mlps) - 2):
+            heads.append(create_convblock1d(mlps[i], mlps[i + 1],
+                                            norm_args=norm_args,
+                                            act_args=act_args))
+            if dropout:
+                heads.append(nn.Dropout(dropout))
+
+        heads.append(create_convblock1d(mlps[-2], mlps[-1], norm_args=norm_args,
+                                            act_args=act_args)) # only difference between SegHead
+        self.head = nn.Sequential(*heads)
+
+    def forward(self, end_points):
+        if self.global_feat is not None: 
+            global_feats = [] 
+            for feat_type in self.global_feat:
+                if 'max' in feat_type:
+                    global_feats.append(torch.max(end_points, dim=-1, keepdim=True)[0])
+                elif feat_type in ['avg', 'mean']:
+                    global_feats.append(torch.mean(end_points, dim=-1, keepdim=True))
+            global_feats = torch.cat(global_feats, dim=1).expand(-1, -1, end_points.shape[-1])
+            end_points = torch.cat((end_points, global_feats), dim=1)
+        logits = self.head(end_points)
+        return logits
 
 @MODELS.register_module()
 class VariableSegHead(nn.Module):

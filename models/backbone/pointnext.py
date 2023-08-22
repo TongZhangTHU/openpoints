@@ -224,7 +224,8 @@ class FeaturePropogation(nn.Module):
                                                 ))
             self.convs = nn.Sequential(*convs)
 
-        self.pool = lambda x: torch.mean(x, dim=-1, keepdim=False)
+        # self.pool = lambda x: torch.mean(x, dim=-1, keepdim=False)
+        self.pool = get_reduction_fn('mean')
 
     def forward(self, pf1, pf2=None):
         # pfb1 is with the same size of upsampled points
