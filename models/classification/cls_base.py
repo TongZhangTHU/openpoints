@@ -23,7 +23,7 @@ class BaseCls(nn.Module):
             in_channels = self.encoder.out_channels if hasattr(self.encoder, 'out_channels') else cls_args.get('in_channels', None)
             if 'prediction_concat_dim' in cls_args:
                 in_channels = in_channels + cls_args.prediction_concat_dim
-                print('prediction_concat_dim is used to added to in_channels')
+                logging.info('BaseCls: prediction_concat_dim is used to added to in_channels')
             cls_args.in_channels = in_channels
             self.prediction = build_model_from_cfg(cls_args)
         else:
