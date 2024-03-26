@@ -40,10 +40,17 @@ class BaseSeg(nn.Module):
             #     in_channels = in_channels + cls_args.prediction_concat_dim
             #     print('prediction_concat_dim is used to added to in_channels')
             cls_args.in_channels = in_channels
-            print('cls_args.in_channels:', in_channels)
+            self.concat_encoder_feat = cls_args.concat_encoder_feat if cls_args.concat_encoder_feat.lower()!='none' else None
+            cls_args.pop('concat_encoder_feat')
+            if self.concat_encoder_feat in ['max', 'mean', 'avg']:
+                cls_args.in_channels += self.encoder.out_channels
+            elif self.concat_encoder_feat is not None:
+                raise NotImplementedError(f'Unknown concat_encoder_feat: {self.concat_encoder_feat}.')
+            logging.info(f'cls_args.in_channels: {cls_args.in_channels}')
             self.head = build_model_from_cfg(cls_args)
         else:
             self.head = None
+            self.concat_encoder_feat = None
 
     def forward(self, data, prediction_concat_content=None, frozen_encoder=False):
         if prediction_concat_content is not None:
@@ -52,9 +59,16 @@ class BaseSeg(nn.Module):
             raise NotImplementedError('frozen_encoder is not implemented for segmentation')
 
         p, f = self.encoder.forward_seg_feat(data)
+        #  f[-1].shape: [B, C, n] [16, 1024, 4]
+        if self.concat_encoder_feat == 'max':
+            global_feats = torch.max(f[-1], dim=-1, keepdim=True)[0].expand(-1, -1, f[0].shape[-1])
+        elif self.concat_encoder_feat in ['mean', 'avg']:
+            global_feats = torch.mean(f[-1], dim=-1, keepdim=True).expand(-1, -1, f[0].shape[-1])
         if self.decoder is not None:
             f = self.decoder(p, f).squeeze(-1)
         if self.head is not None:
+            if self.concat_encoder_feat in ['max', 'mean', 'avg']:
+                f = torch.cat((f, global_feats), dim=1)
             f = self.head(f)
         return f
 
