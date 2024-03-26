@@ -269,7 +269,7 @@ class PointNextLangHierachicalEncoder(nn.Module):
         
         self.feature_dropout_dict = nn.ModuleDict()
         for index in self.resnet_layer_index:
-            self.feature_dropout_dict.update({str(index): nn.Dropout(self.feature_dropout)})
+            self.feature_dropout_dict.update({str(index): nn.Dropout(self.feature_dropout)}) # different from color drop or feature drop
 
     def _to_full_list(self, param, param_scaling=1):
         # param can be: radius, nsample
