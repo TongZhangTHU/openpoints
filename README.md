@@ -14,6 +14,8 @@ OpenPoints currently supports reproducing the following models:
 - PointNeXt
 - Pix4Point
 
+## SGR's Modifications (TODO)
+- [ ] merge and summarize SGR's modifications
 
 
 ## Features
