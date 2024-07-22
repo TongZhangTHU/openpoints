@@ -46,7 +46,7 @@ class BaseSeg(nn.Module):
                 cls_args.in_channels += self.encoder.out_channels
             elif self.concat_encoder_feat is not None:
                 raise NotImplementedError(f'Unknown concat_encoder_feat: {self.concat_encoder_feat}.')
-            logging.info(f'cls_args.in_channels: {cls_args.in_channels}')
+            # logging.info(f'cls_args.in_channels: {cls_args.in_channels}')
             self.head = build_model_from_cfg(cls_args)
         else:
             self.head = None

@@ -234,7 +234,7 @@ class PointNextLangHierachicalEncoder(nn.Module):
 
         self.radii = self._to_full_list(radius, radius_scaling)
         self.nsample = self._to_full_list(nsample, nsample_scaling)
-        logging.info(f'radius: {self.radii},\n nsample: {self.nsample}')
+        # logging.info(f'radius: {self.radii},\n nsample: {self.nsample}')
 
         # double width after downsampling.
         channels = []
